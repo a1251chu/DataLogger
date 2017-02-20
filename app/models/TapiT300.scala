@@ -11,6 +11,8 @@ object TapiT300 extends TapiTxx(ModelConfig("T300", List("CO"))) {
     val props = Props(classOf[T300Collector], id, modelReg, config)
     TapiTxxCollector.start(protocol, props)
   }
+  
+  var vCO:Double = 0
 }
 
 import TapiTxx._
@@ -28,7 +30,7 @@ class T300Collector(instId: String, modelReg: ModelReg, config: TapiConfig) exte
       regIdxCO.get
     }))
 
-    ReportData(List(MonitorTypeData(CO, vCO._2.toDouble, collectorState)))
+    ReportData(List(MonitorTypeData(CO, TapiT300.vCO, collectorState)))
 
   }
 

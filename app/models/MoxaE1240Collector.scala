@@ -44,6 +44,9 @@ class MoxaE1240Collector(id: String, protocolParam: ProtocolParam, param: MoxaE1
         idx = cfg._2
       } yield {
         val v = chCfg.mtMin.get + (chCfg.mtMax.get - chCfg.mtMin.get) / (chCfg.max.get - chCfg.min.get) * (values(idx) - chCfg.min.get)
+        if (chCfg.mt.get == MonitorType.withName("CO")) {
+          TapiT300.vCO = v
+        }
         MonitorTypeData(chCfg.mt.get, v, "010")
       }
     context.parent ! ReportData(dataList.toList)
@@ -89,32 +92,32 @@ class MoxaE1240Collector(id: String, protocolParam: ProtocolParam, param: MoxaE1
     case Collect =>
       Future {
         blocking {
-          try{
-          import com.serotonin.modbus4j.BatchRead
-          val batch = new BatchRead[Integer]
+          try {
+            import com.serotonin.modbus4j.BatchRead
+            val batch = new BatchRead[Integer]
 
-          import com.serotonin.modbus4j.locator.BaseLocator
-          import com.serotonin.modbus4j.code.DataType
+            import com.serotonin.modbus4j.locator.BaseLocator
+            import com.serotonin.modbus4j.code.DataType
 
-          for (idx <- 0 to 7)
-            batch.addLocator(idx, BaseLocator.inputRegister(1, 8 + 2*idx, DataType.FOUR_BYTE_FLOAT_SWAPPED))
+            for (idx <- 0 to 7)
+              batch.addLocator(idx, BaseLocator.inputRegister(1, 8 + 2 * idx, DataType.FOUR_BYTE_FLOAT_SWAPPED))
 
-          batch.setContiguousRequests(true)
+            batch.setContiguousRequests(true)
 
-          assert(masterOpt.isDefined)
-          
-          val rawResult = masterOpt.get.send(batch)
-          val result =
-            for (idx <- 0 to 7) yield rawResult.getFloatValue(idx).toFloat
- 
-          decode(result.toSeq)
-          cancelable = Akka.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(3, SECONDS), self, Collect)
-          }catch{
-            case ex:Throwable=>
+            assert(masterOpt.isDefined)
+
+            val rawResult = masterOpt.get.send(batch)
+            val result =
+              for (idx <- 0 to 7) yield rawResult.getFloatValue(idx).toFloat
+
+            decode(result.toSeq)
+            cancelable = Akka.system.scheduler.scheduleOnce(scala.concurrent.duration.Duration(3, SECONDS), self, Collect)
+          } catch {
+            case ex: Throwable =>
               Logger.error("Read reg failed", ex)
               masterOpt.get.destroy()
               context become handler(collectorState, None)
-              self ! ConnectHost              
+              self ! ConnectHost
           }
         }
       } onFailure errorHandler
